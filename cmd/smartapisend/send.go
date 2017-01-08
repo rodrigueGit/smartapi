@@ -7,9 +7,10 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io"
-	"os"
   "time"
+  "net/http"
+  "encoding/json"
+  "io/ioutil"
 )
 
 //Options structure
@@ -22,31 +23,72 @@ type Options struct {
 type Delivery struct {
 	FileName string
 	Data     []byte
-  Sent  time.Time
+  Sent     time.Time
+}
+
+// Address structure to be used in the address registry
+type Address struct {
+	ID     string    `json:"id"`
+	IP      string    `json:"ip"`
+	Updated time.Time `json:"updated"`
 }
 
 var options Options
 var address string
+var addressResp Address
+var delivery Delivery
 
 func parseOptions() {
 	options.InputFile = flag.String("i", "input", "a file")
 	flag.Parse()
-	options.AddressFile = flag.Args()
-}
-
-func readAddress() {
-	buf := bytes.NewBuffer(nil)
-	f, err := os.Open(options.AddressFile[0])
-	if err != nil {
-		panic(err)
-	}
-	io.Copy(buf, f)
-	f.Close()
-	address = string(buf.Bytes())
+	address = flag.Args()[0]
 }
 
 func readIPAddress() {
-  url := "http://127.0.0.1:8080/address"
+  urlBuffer := bytes.NewBufferString("http://127.0.0.1:8080/address/")
+  urlBuffer.WriteString(address)
+  reqStr := urlBuffer.String()
+  fmt.Printf("Address length: %d", len(address))
+  fmt.Println("URL:", reqStr)
+
+  req, err := http.NewRequest("GET", reqStr, nil)
+  if err!=nil {
+    panic(err)
+  }
+  client := &http.Client{}
+  req.Header.Set("Content-Type", "application/json; charset=UTF-8")
+  resp, err := client.Do(req)
+  if err!=nil {
+    panic(err)
+  }
+
+  defer resp.Body.Close()
+  err = json.NewDecoder(resp.Body).Decode(&addressResp)
+	if err != nil {
+		panic(err)
+	}
+
+  fmt.Println("response Status:", resp.Status)
+  fmt.Println("response Headers:", resp.Header)
+  fmt.Println("response IP:", addressResp.IP)
+}
+
+func sendFile() {
+  delivery.FileName = *options.InputFile
+  delivery.Sent = time.Now()
+  data, err := ioutil.ReadFile(delivery.FileName)
+  if err!=nil {
+    panic(err)
+  }
+  delivery.Data = data
+
+  url := "http://127.0.0.1:8081/file"
+
+  json, err := json.Marshal(delivery)
+  if err != nil {
+    panic(err)
+  }
+
   req, err := http.NewRequest("POST", url, bytes.NewBuffer(json))
   if err != nil {
     panic(err)
@@ -59,17 +101,10 @@ func readIPAddress() {
     panic(err)
   }
   defer resp.Body.Close()
-
-  fmt.Println("response Status:", resp.Status)
-  fmt.Println("response Headers:", resp.Header)
-  body, _ := ioutil.ReadAll(resp.Body)
-  fmt.Println("response Body:", string(body))
 }
 
 func main() {
 	parseOptions()
-	readAddress()
-	fmt.Println("Input file: ", *options.InputFile)
-	fmt.Println("Address file: ", options.AddressFile[0])
-	fmt.Println("Address: ", address)
+  readIPAddress()
+  sendFile()
 }

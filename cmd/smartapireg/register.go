@@ -3,10 +3,11 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
 	"encoding/json"
-	"encoding/pem"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -17,31 +18,41 @@ import (
 
 //Address structure used to register public key
 type Address struct {
-	Key     string    `json:"key"`
+	ID      string    `json:"id"`
 	IP      string    `json:"ip"`
 	Updated time.Time `json:"updated"`
 }
 
-func main() {
-	url := "http://127.0.0.1:8080/address"
-	var key *rsa.PrivateKey
-	var address Address
+//Identity structure used to define a unique ID
+type Identity struct {
+	ID	string `json:"key"`
+	PrivateKey ecdsa.PrivateKey `json:"privateKey"`
+	Generated time.Time `json:"generated"`
+}
 
-	//Generate key pair
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		panic(err)
-	}
-	PubASN1, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
-	if err != nil {
-		panic(err)
-	}
+func generateKey(id *Identity) {
 
-	pubBytes := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PUBLIC KEY",
-		Bytes: PubASN1,
-	})
+	//Generate key pair based on ecdsa
+	pubkeyCurve := elliptic.P256()
+	key, err := ecdsa.GenerateKey(pubkeyCurve, rand.Reader) // this generates a public & private key pair
 
+ 	if err != nil {
+ 		panic(err)
+ 	}
+
+	//Hash public key into address ID
+	var pubKeyBuffer bytes.Buffer
+	pubKeyBuffer.WriteString(key.PublicKey.X.String())
+	pubKeyBuffer.WriteString(key.PublicKey.Y.String())
+	id.PrivateKey = *key
+	sha256Hash := sha256.Sum256(pubKeyBuffer.Bytes())
+	fmt.Println("Base for SHA256:", hex.EncodeToString(sha256Hash[:]))
+
+	id.ID = hex.EncodeToString(sha256Hash[:])
+	id.Generated = time.Now()
+}
+
+func getAddress(address *Address) {
 	host, _ := os.Hostname()
 	addrs, _ := net.LookupIP(host)
 	for _, addr := range addrs {
@@ -49,9 +60,12 @@ func main() {
 			address.IP = ipv4.String()
 		}
 	}
+}
 
-	address.Key = string(pubBytes)
+func registerAddress(identity *Identity, address *Address) {
+	address.ID = identity.ID
 	address.Updated = time.Now()
+	url := "http://127.0.0.1:8080/address"
 
 	json, err := json.Marshal(address)
 	if err != nil {
@@ -75,4 +89,13 @@ func main() {
 	fmt.Println("response Headers:", resp.Header)
 	body, _ := ioutil.ReadAll(resp.Body)
 	fmt.Println("response Body:", string(body))
+}
+
+func main() {
+	var identity Identity
+	var address Address
+
+	generateKey(&identity)
+	getAddress(&address)
+	registerAddress(&identity, &address)
 }
