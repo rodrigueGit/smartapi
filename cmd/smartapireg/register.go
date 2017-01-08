@@ -65,7 +65,7 @@ func getAddress(address *Address) {
 func registerAddress(identity *Identity, address *Address) {
 	address.ID = identity.ID
 	address.Updated = time.Now()
-	url := "http://127.0.0.1:8080/address"
+	url := "http://smartapi-155012.appspot.com/address"
 
 	json, err := json.Marshal(address)
 	if err != nil {

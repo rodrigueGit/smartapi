@@ -82,7 +82,7 @@ func sendFile() {
   }
   delivery.Data = data
 
-  url := "http://127.0.0.1:8081/file"
+  url := "http://smartapirec.appspot.com/file"
 
   json, err := json.Marshal(delivery)
   if err != nil {
