@@ -45,7 +45,7 @@ func parseOptions() {
 }
 
 func readIPAddress() {
-  urlBuffer := bytes.NewBufferString("http://127.0.0.1:8080/address/")
+  urlBuffer := bytes.NewBufferString("http://smartapi-155012.appspot.com/address/")
   urlBuffer.WriteString(address)
   reqStr := urlBuffer.String()
   fmt.Printf("Address length: %d", len(address))

@@ -22,6 +22,7 @@ func init() {
   list = make(map[string]Delivery)
 	router := mux.NewRouter()
 	router.HandleFunc("/file", GetFiles).Methods("GET")
+	router.HandleFunc("/file/{name}", GetFileByName).Methods("GET")
   router.HandleFunc("/file", AddFile).Methods("POST")
 	http.Handle("/", router)
 }
@@ -31,6 +32,15 @@ func GetFiles(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(list); err != nil {
+		panic(err)
+	}
+}
+
+//GetFileByName provides the delivery with file name
+func GetFileByName(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(list[string(mux.Vars(r)["name"])]); err != nil {
 		panic(err)
 	}
 }
